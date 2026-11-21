@@ -1,0 +1,8 @@
+{
+  "raw_rows": 9788,
+  "invalid_rows_removed": 0,
+  "invalid_age_removed": 0,
+  "near_duplicates_removed": 252,
+  "clean_rows": 9536,
+  "price_unit": "Lakhs"
+}

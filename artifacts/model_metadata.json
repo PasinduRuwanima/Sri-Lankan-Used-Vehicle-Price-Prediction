@@ -1,0 +1,30 @@
+{
+  "selected_model": "Extra Trees",
+  "selection_metric": "3-fold cross-validation MAE",
+  "CV MAE Lakhs": 5.303819593381156,
+  "test_metrics": {
+    "MAE_Lakhs": 5.150332451400385,
+    "RMSE_Lakhs": 15.07936213441518,
+    "R2": 0.8944738492212787
+  },
+  "price_unit": "Lakhs",
+  "price_lkr_multiplier": 100000,
+  "random_state": 42,
+  "feature_names": [
+    "Brand",
+    "Model",
+    "YOM",
+    "Engine (cc)",
+    "Gear",
+    "Fuel Type",
+    "Millage(KM)",
+    "Town",
+    "Leasing",
+    "Condition",
+    "AIR CONDITION",
+    "POWER STEERING",
+    "POWER MIRROR",
+    "POWER WINDOW",
+    "Vehicle Age"
+  ]
+}
