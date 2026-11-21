@@ -64,7 +64,6 @@ pages = [
     "Ensemble Model Comparison",
     "Model Performance",
     "Vehicle Price Prediction",
-    "About the Project",
 ]
 page = st.sidebar.radio("Navigation", pages)
 
@@ -105,7 +104,37 @@ elif page == "Dataset Exploration":
     brands = st.multiselect("Filter brands", sorted(data["Brand"].unique()), default=[])
     filtered = data[data["Brand"].isin(brands)].copy() if brands else data.copy()
 
-    st.dataframe(filtered.head(100), use_container_width=True)
+    page_size = 100
+    total_rows = len(filtered)
+    total_pages = max(1, (total_rows + page_size - 1) // page_size)
+    filter_key = tuple(brands)
+
+    if st.session_state.get("dataset_filter_key") != filter_key:
+        st.session_state["dataset_filter_key"] = filter_key
+        st.session_state["dataset_page"] = 1
+    if "dataset_page" not in st.session_state:
+        st.session_state["dataset_page"] = 1
+
+    current_page = min(st.session_state["dataset_page"], total_pages)
+    start = (current_page - 1) * page_size
+    table_page = filtered.iloc[start:start + page_size]
+
+    st.dataframe(table_page, use_container_width=True, height=500)
+
+    previous, page_label, next_page = st.columns([1, 4, 1])
+    with previous:
+        if st.button("Previous", disabled=current_page <= 1):
+            st.session_state["dataset_page"] = current_page - 1
+            st.rerun()
+    with page_label:
+        st.caption(
+            f"Showing rows {start + 1}-{min(start + page_size, total_rows)} "
+            f"of {total_rows:,} | Page {current_page} of {total_pages}"
+        )
+    with next_page:
+        if st.button("Next", disabled=current_page >= total_pages):
+            st.session_state["dataset_page"] = current_page + 1
+            st.rerun()
 
     col1, col2 = st.columns(2)
     fig = px.histogram(filtered, x="Price", nbins=50, title="Vehicle Price Distribution")
@@ -238,26 +267,3 @@ elif page == "Vehicle Price Prediction":
             "This estimate uses historical vehicle listing data and is not a guaranteed "
             "transaction price."
         )
-
-else:
-    st.title("About the Project")
-    st.write(
-        "This project predicts Sri Lankan used vehicle prices using supervised tabular "
-        "regression and compares dummy, linear, bagging, boosting, voting, and stacking models."
-    )
-    st.subheader("Methodology")
-    st.write(
-        "The data was cleaned, near-duplicate listings were removed, categorical variables "
-        "were one-hot encoded, numeric variables were imputed and scaled, and an 80/20 "
-        "train/test split was used with random state 42."
-    )
-    st.subheader("Dataset and Metrics")
-    st.write(
-        "Price is measured in Lakhs (1 Lakh = LKR 100,000). Evaluation uses MAE, RMSE, "
-        "and R-squared. MAE and RMSE are reported in Lakhs."
-    )
-    st.subheader("Limitations")
-    st.write(
-        "Listings reflect historical market conditions and may not capture negotiation, "
-        "vehicle-specific defects, auction timing, or future market shifts."
-    )
