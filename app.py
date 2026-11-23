@@ -70,6 +70,15 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+pages = [
+    "Overview",
+    "Dataset Exploration",
+    "Ensemble Model Comparison",
+    "Model Performance",
+    "Vehicle Price Prediction",
+]
+page = st.sidebar.radio("Navigation", pages)
+
 data = load_data()
 categories = load_json("input_categories.json")
 metadata = load_json("model_metadata.json")
@@ -152,64 +161,55 @@ elif page == "Dataset Exploration":
     )
     filtered = data[data["Brand"].isin(brands)].copy() if brands else data.copy()
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Listings", f"{len(filtered):,}")
-    c2.metric("Median price", f'{filtered["Price"].median():.2f} Lakhs')
-    c3.metric("Median mileage", f'{filtered["Millage(KM)"].median():,.0f} km')
-
-    left, right = st.columns(2)
-    with left:
-        fig = px.histogram(
-            filtered,
-            x="Price",
-            nbins=50,
-            title="Price distribution",
-            labels={"Price": "Price (Lakhs)"},
-        )
-        fig.update_layout(template="plotly_white")
-        st.plotly_chart(fig, width="stretch")
-
-    with right:
-        medians = (
-            filtered.groupby("Brand", as_index=False)["Price"]
-            .median()
-            .nlargest(12, "Price")
-        )
-        fig = px.bar(
-            medians,
-            x="Price",
-            y="Brand",
-            orientation="h",
-            title="Top brands by median price",
-            labels={"Price": "Median price (Lakhs)", "Brand": "Brand"},
-        )
-        fig.update_layout(template="plotly_white", yaxis={"categoryorder": "total ascending"})
-        st.plotly_chart(fig, width="stretch")
-
-    st.subheader("Browse listings")
+    page_size = 100
+    total_rows = len(filtered)
+    total_pages = max(1, (total_rows + page_size - 1) // page_size)
     filter_key = tuple(brands)
+
     if st.session_state.get("dataset_filter_key") != filter_key:
         st.session_state["dataset_filter_key"] = filter_key
         st.session_state["dataset_page"] = 1
-    total_pages = max(1, (len(filtered) + 99) // 100)
-    current_page = st.number_input(
-        "Page",
-        min_value=1,
-        max_value=total_pages,
-        step=1,
-        key="dataset_page",
-    )
-    start = (current_page - 1) * 100
-    st.dataframe(
-        filtered.iloc[start:start + 100],
-        width="stretch",
-        hide_index=True,
-        height=420,
-    )
-    st.caption(
-        f"Showing {start + 1:,}-{min(start + 100, len(filtered)):,} "
-        f"of {len(filtered):,} listings"
-    )
+    if "dataset_page" not in st.session_state:
+        st.session_state["dataset_page"] = 1
+
+    current_page = min(st.session_state["dataset_page"], total_pages)
+    start = (current_page - 1) * page_size
+    table_page = filtered.iloc[start:start + page_size]
+
+    st.dataframe(table_page, use_container_width=True, height=500)
+
+    previous, page_label, next_page = st.columns([1, 4, 1])
+    with previous:
+        if st.button("Previous", disabled=current_page <= 1):
+            st.session_state["dataset_page"] = current_page - 1
+            st.rerun()
+    with page_label:
+        st.caption(
+            f"Showing rows {start + 1}-{min(start + page_size, total_rows)} "
+            f"of {total_rows:,} | Page {current_page} of {total_pages}"
+        )
+    with next_page:
+        if st.button("Next", disabled=current_page >= total_pages):
+            st.session_state["dataset_page"] = current_page + 1
+            st.rerun()
+
+    col1, col2 = st.columns(2)
+    fig = px.histogram(filtered, x="Price", nbins=50, title="Vehicle Price Distribution")
+    fig.update_layout(xaxis_title="Price (Lakhs)", yaxis_title="Listings")
+    col1.plotly_chart(fig, use_container_width=True)
+
+    brand_median = filtered.groupby("Brand", as_index=False)["Price"].median()
+    brand_median = brand_median.sort_values("Price", ascending=False).head(20)
+    fig = px.bar(brand_median, x="Price", y="Brand", orientation="h",
+                 title="Top 20 Brands by Median Price")
+    fig.update_layout(xaxis_title="Median Price (Lakhs)", yaxis_title="Brand")
+    col2.plotly_chart(fig, use_container_width=True)
+
+    col1, col2 = st.columns(2)
+    fig = px.scatter(filtered, x="Millage(KM)", y="Price", color="Fuel Type",
+                     title="Mileage versus Price", opacity=0.55)
+    fig.update_layout(xaxis_title="Mileage (KM)", yaxis_title="Price (Lakhs)")
+    col1.plotly_chart(fig, use_container_width=True)
 
 
 elif page == "Ensemble Model Comparison":
@@ -327,93 +327,4 @@ elif page == "Vehicle Price Prediction":
             "Model",
             matching_models or ["Unknown"],
             key=f"model_{brand}",
-        )
-
-        c1, c2, c3 = st.columns(3)
-        year = c1.number_input(
-            "Manufacture year",
-            min_value=1956,
-            max_value=listing_year,
-            value=min(2018, listing_year),
-        )
-        engine = c2.number_input(
-            "Engine (cc)",
-            min_value=100,
-            max_value=10000,
-            value=1500,
-            step=100,
-        )
-        mileage = c3.number_input(
-            "Mileage (km)",
-            min_value=0,
-            max_value=2000000,
-            value=80000,
-            step=1000,
-        )
-
-        c1, c2 = st.columns(2)
-        gear = c1.selectbox("Transmission", categories["Gear"])
-        fuel = c2.selectbox("Fuel type", categories["Fuel Type"])
-        town = c1.selectbox("Town", categories["Town"])
-        condition = c2.selectbox("Condition", categories["Condition"])
-        leasing = c1.selectbox("Leasing status", categories["Leasing"])
-
-        c1, c2 = st.columns(2)
-        air = c1.selectbox("Air conditioning", categories["AIR CONDITION"])
-        steering = c2.selectbox("Power steering", categories["POWER STEERING"])
-        mirror = c1.selectbox("Power mirrors", categories["POWER MIRROR"])
-        window = c2.selectbox("Power windows", categories["POWER WINDOW"])
-
-        predict = st.button(
-            "Estimate vehicle price",
-            type="primary",
-            width="stretch",
-        )
-
-    vehicle_input = {
-        "Brand": brand,
-        "Model": model_name,
-        "YOM": int(year),
-        "Engine (cc)": float(engine),
-        "Gear": gear,
-        "Fuel Type": fuel,
-        "Millage(KM)": float(mileage),
-        "Town": town,
-        "Leasing": leasing,
-        "Condition": condition,
-        "AIR CONDITION": air,
-        "POWER STEERING": steering,
-        "POWER MIRROR": mirror,
-        "POWER WINDOW": window,
-        "Vehicle Age": max(0, listing_year - int(year)),
-    }
-
-    if predict:
-        prediction_lakhs = float(
-            load_model().predict(pd.DataFrame([vehicle_input]))[0]
-        )
-        st.session_state["estimate"] = {
-            "input": vehicle_input.copy(),
-            "lakhs": prediction_lakhs,
-        }
-
-    with result_col:
-        estimate = st.session_state.get("estimate")
-        current_estimate = estimate and estimate["input"] == vehicle_input
-        if current_estimate:
-            value = float(estimate["lakhs"])
-            st.markdown(
-                f'<div class="estimate-value">LKR {value * 100000:,.0f}</div>',
-                unsafe_allow_html=True,
-            )
-            st.write(f"{value:.2f} Lakhs")
-            st.write(f"{escape(brand)} {escape(model_name)}")
-            st.write(f"{year} | {engine:,} cc | {mileage:,} km")
-        else:
-            st.info("Enter vehicle details, then select Estimate vehicle price.")
-            if estimate:
-                st.info("Vehicle details changed. Run the estimate again to update your result.")
-
-        st.caption(
-            "This is a historical listing estimate, not a guaranteed transaction price."
         )
