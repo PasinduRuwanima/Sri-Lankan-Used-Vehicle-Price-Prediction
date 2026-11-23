@@ -14,6 +14,7 @@ def test_all_dashboard_pages_and_overview_shortcut():
     app.session_state["navigation"] = "About the Project"
     app.run()
     assert not app.exception
+    assert len(app.radio) == 1
     assert app.radio[0].value == "Overview"
     app.button[0].click().run()
     assert app.radio[0].value == "Vehicle Price Prediction"
@@ -47,9 +48,9 @@ def test_dataset_filter_resets_pagination():
     app = AppTest.from_file(ROOT / "app.py", default_timeout=45).run()
     app.radio[0].set_value("Dataset Exploration").run()
     data = pd.read_csv("data/processed/cleaned_vehicle_data.csv")
-    app.number_input[0].set_value(2).run()
+    app.button[1].click().run()
     assert app.dataframe[0].value.iloc[0]["Model"] == data.iloc[100]["Model"]
     app.multiselect[0].set_value(["AUDI"]).run()
-    assert app.number_input[0].value == 1
+    assert app.session_state["dataset_page"] == 1
     assert set(app.dataframe[0].value["Brand"]) == {"AUDI"}
     assert not app.exception
