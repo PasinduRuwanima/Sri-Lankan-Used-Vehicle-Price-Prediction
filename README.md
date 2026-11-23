@@ -61,7 +61,7 @@ The selected deployment model is Extra Trees because it had the lowest cross-val
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-training.txt
 streamlit run app.py
 ```
 
@@ -90,7 +90,7 @@ To execute the complete notebook again:
 1. Push this project to GitHub.
 2. Create a Streamlit Community Cloud app.
 3. Select the repository and set the main file to `app.py`.
-4. Set Python dependencies to `requirements.txt`.
+4. Set Python dependencies to `requirements.txt`. It contains only the packages needed to run the dashboard; model-training and notebook-only packages are in `requirements-training.txt`.
 5. Deploy only after reviewing the repository and results.
 
 No deployment has been performed automatically.
