@@ -13,14 +13,48 @@ from sklearn.ensemble import (
     StackingRegressor,
     VotingRegressor,
 )
+from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.base import BaseEstimator, RegressorMixin
 from xgboost import XGBRegressor
 
 
 TARGET_COLUMN = "Price"
 EXCLUDED_FEATURES = {TARGET_COLUMN, "Date"}
+
+
+class CatBoostSklearnWrapper(BaseEstimator, RegressorMixin):
+    """Small sklearn-compatible adapter for CatBoost regression."""
+
+    def __init__(self, iterations=300, learning_rate=0.05, depth=6, random_seed=42):
+        self.iterations = iterations
+        self.learning_rate = learning_rate
+        self.depth = depth
+        self.random_seed = random_seed
+
+    def fit(self, X, y):
+        from catboost import CatBoostRegressor
+
+        if hasattr(X, "toarray"):
+            X = X.toarray()
+        self.estimator_ = CatBoostRegressor(
+            iterations=self.iterations,
+            learning_rate=self.learning_rate,
+            depth=self.depth,
+            loss_function="RMSE",
+            random_seed=self.random_seed,
+            verbose=False,
+            thread_count=-1,
+        )
+        self.estimator_.fit(X, y)
+        return self
+
+    def predict(self, X):
+        if hasattr(X, "toarray"):
+            X = X.toarray()
+        return self.estimator_.predict(X)
 
 
 def feature_columns(data: pd.DataFrame) -> list[str]:
@@ -94,6 +128,18 @@ def baseline_models(preprocessor: ColumnTransformer) -> dict[str, Pipeline]:
 
 def ensemble_models(preprocessor: ColumnTransformer) -> dict[str, Pipeline | StackingRegressor | VotingRegressor]:
     """Create untuned ensemble model pipelines."""
+    try:
+        from catboost import CatBoostRegressor
+        catboost_available = True
+    except ImportError:
+        catboost_available = False
+
+    try:
+        from lightgbm import LGBMRegressor
+        lightgbm_available = True
+    except ImportError:
+        lightgbm_available = False
+
     random_forest = RandomForestRegressor(
         n_estimators=200,
         random_state=42,
@@ -150,6 +196,22 @@ def ensemble_models(preprocessor: ColumnTransformer) -> dict[str, Pipeline | Sta
             ("model", extra_trees),
         ]
     )
+    ann = Pipeline(
+        steps=[
+            ("preprocessor", preprocessor),
+            (
+                "model",
+                MLPRegressor(
+                    hidden_layer_sizes=(64, 32),
+                    activation="relu",
+                    solver="adam",
+                    early_stopping=True,
+                    max_iter=500,
+                    random_state=42,
+                ),
+            ),
+        ]
+    )
 
     voting = VotingRegressor(
         estimators=[
@@ -170,12 +232,58 @@ def ensemble_models(preprocessor: ColumnTransformer) -> dict[str, Pipeline | Sta
         passthrough=False,
         n_jobs=-1,
     )
+    rf_ann_hybrid = StackingRegressor(
+        estimators=[
+            ("random_forest", rf),
+            ("ann", ann),
+        ],
+        final_estimator=Ridge(alpha=1.0),
+        cv=5,
+        passthrough=False,
+        n_jobs=-1,
+    )
 
-    return {
+    models = {
         "Random Forest": rf,
         "Gradient Boosting": gbr,
         "XGBoost": xgb,
         "Extra Trees": extra,
         "Voting": voting,
         "Stacking": stacking,
+        "Random Forest + ANN": rf_ann_hybrid,
     }
+
+    if lightgbm_available:
+        models["LightGBM"] = Pipeline(
+            steps=[
+                ("preprocessor", preprocessor),
+                (
+                    "model",
+                    LGBMRegressor(
+                        n_estimators=300,
+                        learning_rate=0.05,
+                        random_state=42,
+                        n_jobs=-1,
+                        verbosity=-1,
+                    ),
+                ),
+            ]
+        )
+
+    if catboost_available:
+        models["CatBoost"] = Pipeline(
+            steps=[
+                ("preprocessor", preprocessor),
+                (
+                    "model",
+                    CatBoostSklearnWrapper(
+                        iterations=300,
+                        learning_rate=0.05,
+                        depth=6,
+                        random_seed=42,
+                    ),
+                ),
+            ]
+        )
+
+    return models
