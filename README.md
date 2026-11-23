@@ -33,6 +33,8 @@ The source file is `data/raw/car_price_dataset.csv`. It contains 9,788 listings 
 - Numeric median imputation and standardization.
 - Categorical most-frequent imputation and one-hot encoding with unseen-category handling.
 - Models: Dummy Mean, Ridge, Random Forest, Extra Trees, Gradient Boosting, XGBoost, Voting, and Stacking.
+- Boosting coverage also includes untuned LightGBM and CatBoost candidates.
+- Hybrid coverage includes an `Random Forest + ANN` stacking model with Ridge as the meta-learner.
 
 ## Real Results
 
@@ -41,13 +43,16 @@ Primary model-selection metric: 3-fold cross-validation MAE in Lakhs.
 | Model | CV MAE (Lakhs) | Test MAE (Lakhs) | Test RMSE (Lakhs) | Test R-squared |
 |---|---:|---:|---:|---:|
 | Extra Trees | 5.304 | 5.150 | 15.079 | 0.894 |
-| Random Forest | 5.495 | 11.249* | 24.407* | 0.724* |
-| XGBoost | 6.526 | 6.563 | 14.630 | 0.901 |
-| Gradient Boosting | 8.275 | 8.039 | 15.995 | 0.881 |
-| Ridge | 9.030 | 9.339 | 20.689 | 0.801 |
-| Dummy Mean | - | 30.244 | 46.432 | -0.001 |
+| Random Forest | 5.495 | 5.356 | 14.983 | 0.896 |
+| Stacking | 5.799 | 5.815 | 14.678 | 0.900 |
+| RF + ANN Hybrid | 5.505 | 5.597 | 14.268 | 0.906 |
+| XGBoost | 6.526 | 6.463 | 14.286 | 0.905 |
+| LightGBM | 6.904 | 6.550 | 13.648 | 0.914 |
+| Voting | 6.479 | 6.604 | 15.815 | 0.884 |
+| Gradient Boosting | 8.275 | 8.533 | 16.795 | 0.869 |
+| CatBoost | 8.144 | 8.462 | 16.706 | 0.870 |
 
-`*` Random Forest test values shown are from the tuned candidate in the combined comparison.
+The Extra Trees model is selected for deployment because it has the lowest 3-fold cross-validation MAE. LightGBM has the lowest held-out RMSE and highest held-out R-squared in this run, but model selection is based on the cross-validation MAE to avoid selecting from test-set performance.
 
 The selected deployment model is Extra Trees because it had the lowest cross-validation MAE among the cross-validated candidates.
 
@@ -70,7 +75,15 @@ Open the local URL printed by Streamlit, normally `http://localhost:8501`.
 
 ## Notebooks
 
-Run `notebooks/01_data_exploration.ipynb` from Jupyter or VS Code.
+The notebooks are:
+
+- `notebooks/ensemble_comparison.ipynb`: executed complete ensemble comparison, tuning results, held-out metrics, charts, dataset analysis, and interpretation.
+
+To execute the complete notebook again:
+
+```powershell
+.venv\Scripts\jupyter.exe nbconvert --to notebook --execute notebooks\ensemble_comparison.ipynb --inplace --ExecutePreprocessor.timeout=600
+```
 
 ## Streamlit Cloud Deployment
 
@@ -85,3 +98,7 @@ No deployment has been performed automatically.
 ## Limitations
 
 Predictions reflect historical listing data and may not capture negotiation, defects, market shocks, or future price changes. They are estimates, not guaranteed transaction prices.
+
+## AI Usage
+
+GitHub Copilot was used as a development aid for project code and dashboard UI work. Final implementation, model execution, results, and project documentation were reviewed locally.
